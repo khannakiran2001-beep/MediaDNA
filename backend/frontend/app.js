@@ -305,7 +305,7 @@ async function openAsset(id) {
     api(`/assets/${id}`), api(`/assets/${id}/versions`), api(`/assets/${id}/related`), api(`/assets/${id}/comments`)]);
   const m = document.getElementById('modal');
   const t = thumb(a);
-  const preview = t ? `<img src="${t}" class="w-full rounded-lg">` : `<div class="w-full h-64 rounded-lg flex items-center justify-center text-6xl bg-panel2">${icon[a.media_type]}</div>`;
+  const preview = t ? `<img id="previewImg" src="${t}" class="w-full rounded-lg block">` : `<div class="w-full h-64 rounded-lg flex items-center justify-center text-6xl bg-panel2">${icon[a.media_type]}</div>`;
   const dna = (k,v) => v||v===0 ? `<div class="flex justify-between gap-4 py-1.5 border-b border-white/5 text-sm"><span class="text-slate-500">${k}</span><span class="text-right font-mono text-xs">${v}</span></div>` : '';
   const chips = arr => (arr||[]).map(x=>`<span class="text-xs px-2 py-0.5 rounded bg-white/5 mr-1 mb-1 inline-block">${typeof x==='object'?x.label:x}</span>`).join('');
   m.innerHTML = `
@@ -316,10 +316,12 @@ async function openAsset(id) {
       </div>
       <div class="grid md:grid-cols-2 gap-6 p-6 max-h-[80vh] overflow-y-auto">
         <div>
-          ${preview}
-          <div class="flex gap-2 mt-3">
-            <a href="/api/assets/${a.id}/file" download class="flex-1 text-center px-3 py-2 rounded-lg bg-white/10 text-sm">⤓ Download</a>
-            <button onclick="forkAsset('${a.id}')" class="flex-1 px-3 py-2 rounded-lg text-white text-sm" style="background:linear-gradient(135deg,#7c5cff,#6d4bff)">⑂ Fork</button>
+          <div id="previewWrap" class="relative select-none">${preview}</div>
+          <div id="assetActionStatus" class="text-xs text-accent2 mt-2 min-h-[16px]"></div>
+          <div class="flex gap-2 mt-1 flex-wrap">
+            <a href="/api/assets/${a.id}/file" download class="px-3 py-2 rounded-lg bg-white/10 text-sm">⤓ Download</a>
+            <button onclick="forkAsset('${a.id}')" class="px-3 py-2 rounded-lg text-white text-sm" style="background:linear-gradient(135deg,#7c5cff,#6d4bff)">⑂ Fork / Regenerate</button>
+            ${a.media_type==='image' ? `<button onclick="startRegionEdit('${a.id}')" class="px-3 py-2 rounded-lg bg-white/10 text-sm">✏️ Edit region</button>` : ''}
             <button onclick="deleteAsset('${a.id}')" class="px-3 py-2 rounded-lg bg-red-500/20 text-red-300 text-sm">Delete</button>
           </div>
           <div class="mt-4"><div class="text-xs text-slate-500 mb-1">Dominant colors</div>
@@ -364,9 +366,50 @@ async function openAsset(id) {
 }
 function closeModal() { const m = document.getElementById('modal'); m.classList.add('hidden'); m.classList.remove('block'); }
 async function forkAsset(id) {
-  const p = prompt('New prompt for the fork (blank keeps original):');
-  await api(`/assets/${id}/fork`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({prompt:p||null, note:'Forked via UI'})});
-  closeModal(); render();
+  const p = prompt('New prompt to regenerate a variation (blank keeps the original prompt):');
+  if (p === null) return; // cancelled
+  const status = document.getElementById('assetActionStatus');
+  if (status) status.textContent = '🎨 Regenerating a new variation via Genblaze…';
+  try {
+    await api(`/assets/${id}/fork`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({prompt:p||null, note:'Regenerated via UI'})});
+    if (status) status.textContent = '✅ New version created.';
+    closeModal(); state.view = 'assets'; render();
+  } catch (e) { if (status) status.textContent = '❌ Regeneration failed.'; }
+}
+
+// Drag a box over the preview to regenerate just that region.
+function startRegionEdit(id) {
+  const wrap = document.getElementById('previewWrap');
+  const img = document.getElementById('previewImg');
+  const status = document.getElementById('assetActionStatus');
+  if (!wrap || !img) return;
+  if (wrap.querySelector('.region-ov')) return; // already active
+  status.textContent = '✏️ Drag a box over the area you want to change…';
+  const ov = document.createElement('div');
+  ov.className = 'region-ov';
+  ov.style.cssText = 'position:absolute;inset:0;cursor:crosshair;background:rgba(0,0,0,.2);border-radius:.5rem';
+  const sel = document.createElement('div');
+  sel.style.cssText = 'position:absolute;border:2px dashed #22d3ee;background:rgba(34,211,238,.18);display:none';
+  ov.appendChild(sel); wrap.appendChild(ov);
+  let sx = 0, sy = 0, drawing = false;
+  const rect = () => ov.getBoundingClientRect();
+  ov.addEventListener('mousedown', e => { const r = rect(); sx = e.clientX-r.left; sy = e.clientY-r.top; drawing = true; Object.assign(sel.style, {display:'block', left:sx+'px', top:sy+'px', width:'0px', height:'0px'}); });
+  ov.addEventListener('mousemove', e => { if (!drawing) return; const r = rect(); const cx = e.clientX-r.left, cy = e.clientY-r.top; Object.assign(sel.style, {left:Math.min(sx,cx)+'px', top:Math.min(sy,cy)+'px', width:Math.abs(cx-sx)+'px', height:Math.abs(cy-sy)+'px'}); });
+  ov.addEventListener('mouseup', async () => {
+    drawing = false; const r = rect();
+    const x0 = parseFloat(sel.style.left)/r.width, y0 = parseFloat(sel.style.top)/r.height;
+    const x1 = x0 + parseFloat(sel.style.width)/r.width, y1 = y0 + parseFloat(sel.style.height)/r.height;
+    if ((x1-x0) < 0.03 || (y1-y0) < 0.03) { status.textContent = 'Selection too small — drag a bigger box.'; return; }
+    const p = prompt('Describe what should appear in the selected area:');
+    ov.remove();
+    if (!p) { status.textContent = ''; return; }
+    status.textContent = '🎨 Regenerating the selected region…';
+    try {
+      await api(`/assets/${id}/edit-region`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({prompt:p, box:[x0,y0,x1,y1]})});
+      status.textContent = '✅ Region updated — new version created.';
+      closeModal(); state.view = 'assets'; render();
+    } catch (e) { status.textContent = '❌ Region edit failed.'; }
+  });
 }
 async function deleteAsset(id) { if (!confirm('Delete this asset?')) return; await api(`/assets/${id}`, {method:'DELETE'}); closeModal(); render(); }
 async function addComment(id) {

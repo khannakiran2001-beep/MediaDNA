@@ -34,6 +34,7 @@ from .schemas import (
     CollectionOut,
     CommentIn,
     CommentOut,
+    EditRegionRequest,
     ForkRequest,
     GenerateRequest,
     GraphResponse,
@@ -325,10 +326,28 @@ def versions(asset_id: str, db: Session = Depends(get_db)):
 
 
 @app.post("/api/assets/{asset_id}/fork", response_model=AssetDetail)
-def fork_asset(asset_id: str, body: ForkRequest, db: Session = Depends(get_db)):
-    child = AssetService(db).fork(asset_id, body.prompt, body.note)
+def fork_asset(request: Request, asset_id: str, body: ForkRequest, db: Session = Depends(get_db)):
+    child = AssetService(db).fork(
+        asset_id, body.prompt, body.note,
+        owner_id=getattr(request.state, "user_id", None),
+        owner_email=getattr(request.state, "user_email", ""),
+    )
     if not child:
         raise HTTPException(404, "Asset not found")
+    return child
+
+
+@app.post("/api/assets/{asset_id}/edit-region", response_model=AssetDetail)
+def edit_region(request: Request, asset_id: str, body: EditRegionRequest, db: Session = Depends(get_db)):
+    if not body.prompt.strip():
+        raise HTTPException(400, "Prompt is required")
+    child = AssetService(db).edit_region(
+        asset_id, body.prompt, body.box,
+        owner_id=getattr(request.state, "user_id", None),
+        owner_email=getattr(request.state, "user_email", ""),
+    )
+    if not child:
+        raise HTTPException(404, "Asset not found or not an image")
     return child
 
 

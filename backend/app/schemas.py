@@ -100,6 +100,11 @@ class ForkRequest(BaseModel):
     note: str = "Forked variation"
 
 
+class EditRegionRequest(BaseModel):
+    prompt: str
+    box: list[float] = Field(..., min_length=4, max_length=4)  # [x0,y0,x1,y1] normalised 0..1
+
+
 class GenerateRequest(BaseModel):
     prompt: str
     negative_prompt: str = ""

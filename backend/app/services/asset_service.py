@@ -111,6 +111,7 @@ class AssetService:
         tags: list[str] | None = None,
         owner_id: str | None = None,
         owner_email: str = "",
+        parent_id: str | None = None,
     ) -> Asset:
         """Generate via the real Genblaze Pipeline, then run the analysis pipeline.
 
@@ -141,6 +142,7 @@ class AssetService:
             },
             owner_id=owner_id,
             owner_email=owner_email,
+            parent_id=parent_id,
         )
         # The Genblaze manifest is the authoritative provenance record.
         if gen.manifest:
@@ -160,25 +162,111 @@ class AssetService:
         })
         return asset
 
-    def fork(self, source_id: str, new_prompt: str | None, note: str) -> Asset | None:
+    def fork(
+        self,
+        source_id: str,
+        new_prompt: str | None,
+        note: str,
+        owner_id: str | None = None,
+        owner_email: str = "",
+    ) -> Asset | None:
+        """Fork = regenerate a NEW variation from the (optionally edited) prompt.
+
+        Produces a fresh image via the Genblaze pipeline (not a copy) and links
+        it as a child version of the source.
+        """
         source = self.assets.get(source_id)
         if not source:
             return None
-        raw = self.storage.get(source.storage_key)
-        child = self.ingest(
-            filename=f"fork_{source.name}",
-            raw=raw,
-            mime_type=source.mime_type,
-            prompt=new_prompt or source.prompt,
+        prompt = (new_prompt or "").strip() or source.prompt or source.caption or source.name
+        model = source.model if source.model and source.model != "uploaded" else "flux"
+        child = self.generate(
+            prompt=prompt,
             negative_prompt=source.negative_prompt,
-            model=source.model,
-            provider_name=source.provider,
+            model=model,
             project=source.project,
             campaign=source.campaign,
             tags=source.tags,
-            generation_params={**(source.generation_params or {}), "forked_from": source.id, "note": note},
+            owner_id=owner_id or source.owner_id,
+            owner_email=owner_email or source.owner_email,
             parent_id=source.id,
         )
+        child.generation_params = {**(child.generation_params or {}), "forked_from": source.id, "note": note}
+        self.assets.save(child)
         self.rels.add(source.id, child.id, "forked_to", 1.0)
-        self.audit.log("fork", child.id, {"source": source.id, "note": note})
+        self.audit.log("fork", child.id, {"source": source.id, "note": note, "prompt": prompt})
+        return child
+
+    def edit_region(
+        self,
+        source_id: str,
+        prompt: str,
+        box: list[float],
+        owner_id: str | None = None,
+        owner_email: str = "",
+    ) -> Asset | None:
+        """Regenerate a selected rectangular region and composite it back.
+
+        ``box`` is [x0, y0, x1, y1] normalised to 0..1. New content for the
+        region is generated from ``prompt`` and feathered into the original,
+        producing a new version. (Pragmatic region-replace; not full diffusion
+        inpainting, which needs a paid masked-generation provider.)
+        """
+        import io
+
+        from PIL import Image, ImageFilter
+
+        from . import generation
+
+        source = self.assets.get(source_id)
+        if source is None or source.media_type != "image":
+            return None
+        base = Image.open(io.BytesIO(self.storage.get(source.storage_key))).convert("RGB")
+        w, h = base.size
+        x0, y0, x1, y1 = box
+        px0, py0 = max(0, int(x0 * w)), max(0, int(y0 * h))
+        px1, py1 = min(w, int(x1 * w)), min(h, int(y1 * h))
+        rw, rh = max(1, px1 - px0), max(1, py1 - py0)
+
+        region_bytes, gen_backend = generation.generate_image(
+            f"{prompt}. {source.caption or ''}".strip(), seed_extra=f"{source.id}:{box}",
+        )
+        patch = Image.open(io.BytesIO(region_bytes)).convert("RGB").resize((rw, rh))
+
+        # feathered alpha mask so the edit blends into the original
+        feather = max(4, min(rw, rh) // 8)
+        mask = Image.new("L", (rw, rh), 255)
+        mask = mask.filter(ImageFilter.GaussianBlur(0))  # base
+        inner = Image.new("L", (rw, rh), 0)
+        from PIL import ImageDraw
+        d = ImageDraw.Draw(inner)
+        d.rectangle([feather, feather, rw - feather, rh - feather], fill=255)
+        mask = inner.filter(ImageFilter.GaussianBlur(feather))
+
+        result = base.copy()
+        result.paste(patch, (px0, py0), mask)
+        out = io.BytesIO()
+        result.save(out, format="PNG")
+
+        child = self.ingest(
+            filename=f"edit_{source.name.rsplit('.', 1)[0]}.png",
+            raw=out.getvalue(),
+            mime_type="image/png",
+            prompt=f"{source.prompt} | region edit: {prompt}".strip(" |"),
+            negative_prompt=source.negative_prompt,
+            model=source.model,
+            provider_name="Genblaze",
+            project=source.project,
+            campaign=source.campaign,
+            tags=source.tags,
+            generation_params={
+                "edited_region": box, "region_prompt": prompt,
+                "generation_backend": gen_backend, "edited_from": source.id,
+            },
+            parent_id=source.id,
+            owner_id=owner_id or source.owner_id,
+            owner_email=owner_email or source.owner_email,
+        )
+        self.rels.add(source.id, child.id, "edited_to", 1.0)
+        self.audit.log("edit_region", child.id, {"source": source.id, "prompt": prompt, "box": box})
         return child
