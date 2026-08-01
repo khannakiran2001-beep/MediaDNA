@@ -1,0 +1,9 @@
+**/__pycache__/
+*.pyc
+.venv/
+venv/
+backend/.env
+backend/data/
+.git/
+.vercel/
+node_modules/

@@ -1,0 +1,25 @@
+# One-click deploy on Render (free tier). Set secrets in the dashboard.
+services:
+  - type: web
+    name: mediadna
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL          # Supabase Postgres connection string
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: B2_KEY_ID
+        sync: false
+      - key: B2_APP_KEY
+        sync: false
+      - key: B2_BUCKET_NAME
+        sync: false
+      - key: B2_REGION
+        sync: false
+      - key: DEFAULT_ADMIN_EMAIL
+        sync: false
+      - key: DEFAULT_ADMIN_PASSWORD
+        sync: false

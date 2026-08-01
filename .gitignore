@@ -1,0 +1,13 @@
+# Secrets — never commit
+backend/.env
+.env
+
+# Local data / SQLite / storage / CA bundle
+backend/data/
+**/__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Vercel
+.vercel/

@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MediaDNA — GitHub for AI Assets</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/cytoscape@3.30.2/dist/cytoscape.min.js"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: { extend: {
+        colors: {
+          bg: '#0a0a0f', panel: '#12121a', panel2: '#1a1a24', line: '#26263400',
+          accent: '#7c5cff', accent2: '#22d3ee', ok: '#34d399', warn: '#fbbf24',
+        },
+        fontFamily: { sans: ['Inter','system-ui','sans-serif'], mono: ['ui-monospace','SFMono-Regular','monospace'] },
+      }}
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root { color-scheme: dark; }
+    body { background: radial-gradient(1200px 600px at 80% -10%, #1a1442 0%, transparent 60%), #0a0a0f; }
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-thumb { background: #2a2a3a; border-radius: 8px; }
+    .glass { background: rgba(18,18,26,.7); backdrop-filter: blur(12px); border: 1px solid #23233340; }
+    .card { transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease; }
+    .card:hover { transform: translateY(-3px); border-color: #7c5cff88; box-shadow: 0 10px 40px -12px #7c5cff55; }
+    .fade-in { animation: fade .35s ease both; }
+    @keyframes fade { from { opacity: 0; transform: translateY(8px);} to {opacity:1; transform:none;} }
+    .grad-text { background: linear-gradient(90deg,#a78bfa,#22d3ee); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    kbd { background:#1f1f2b; border:1px solid #33334a; border-radius:5px; padding:1px 6px; font-size:11px; font-family:ui-monospace,monospace;}
+  </style>
+</head>
+<body class="text-slate-200 font-sans min-h-screen">
+  <div id="app" class="flex min-h-screen"></div>
+
+  <!-- Command palette -->
+  <div id="palette" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm items-start justify-center pt-32 flex">
+    <div class="glass w-[560px] rounded-xl overflow-hidden shadow-2xl">
+      <input id="paletteInput" placeholder="Search assets, or type a command…"
+        class="w-full bg-transparent px-5 py-4 outline-none text-lg border-b border-white/10" />
+      <div id="paletteResults" class="max-h-80 overflow-y-auto"></div>
+      <div class="px-4 py-2 text-xs text-slate-500 border-t border-white/10 flex gap-4">
+        <span><kbd>↵</kbd> open</span><span><kbd>esc</kbd> close</span><span><kbd>⌘K</kbd> toggle</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Asset modal -->
+  <div id="modal" class="hidden fixed inset-0 z-40 bg-black/70 backdrop-blur-sm p-6 overflow-y-auto"></div>
+
+  <!-- Upload modal -->
+  <div id="uploadModal" class="hidden fixed inset-0 z-40 bg-black/70 backdrop-blur-sm p-6 flex items-center justify-center"></div>
+
+  <script src="/app.js?v=6"></script>
+</body>
+</html>
