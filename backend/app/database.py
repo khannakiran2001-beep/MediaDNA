@@ -16,8 +16,28 @@ from .config import get_settings
 
 settings = get_settings()
 
-_connect_args = {"check_same_thread": False} if settings.database_url.startswith("sqlite") else {}
-engine = create_engine(settings.database_url, connect_args=_connect_args, future=True)
+
+def _normalize_db_url(url: str) -> str:
+    """Ensure Postgres URLs use the psycopg (v3) driver we ship.
+
+    Supabase/Heroku hand out ``postgres://`` or ``postgresql://``, which
+    SQLAlchemy maps to psycopg2 (not installed). Rewrite to psycopg v3.
+    """
+    if url.startswith("postgres://"):
+        return "postgresql+psycopg://" + url[len("postgres://"):]
+    if url.startswith("postgresql://"):
+        return "postgresql+psycopg://" + url[len("postgresql://"):]
+    return url
+
+
+DATABASE_URL = _normalize_db_url(settings.database_url)
+
+_connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
+_engine_kwargs: dict = {"connect_args": _connect_args, "future": True}
+if not DATABASE_URL.startswith("sqlite"):
+    # Recycle pooled Postgres connections to survive Supabase pooler timeouts.
+    _engine_kwargs.update(pool_pre_ping=True, pool_recycle=280)
+engine = create_engine(DATABASE_URL, **_engine_kwargs)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False, future=True)
 
 
