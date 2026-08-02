@@ -112,7 +112,7 @@ async def auth_middleware(request: Request, call_next):
 @app.post("/api/auth/request-otp")
 def auth_request_otp(body: OtpRequest, db: Session = Depends(get_db)):
     try:
-        return AuthService(db).request_otp(body.email, body.name, body.purpose)
+        return AuthService(db).request_otp(body.email, body.name, body.purpose, body.password)
     except AuthError as exc:
         raise HTTPException(400, str(exc))
 

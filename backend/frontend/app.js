@@ -510,26 +510,27 @@ function renderAuthBody() {
   const b = document.getElementById('authBody');
   const isLogin = authState.mode === 'login';
   if (authState.step === 'email') {
+    const inputCls = 'w-full mb-3 px-3 py-2.5 rounded-lg bg-white/5 outline-none border border-white/10 focus:border-accent text-sm';
     if (isLogin) {
       b.innerHTML = `
-        <p class="text-sm text-slate-400 mb-4">Sign in with your password, or request a one-time code.</p>
-        <input id="authEmail" type="email" placeholder="you@company.com" class="w-full mb-3 px-3 py-2.5 rounded-lg bg-white/5 outline-none border border-white/10 focus:border-accent text-sm">
-        <input id="authPassword" type="password" placeholder="Password" class="w-full mb-3 px-3 py-2.5 rounded-lg bg-white/5 outline-none border border-white/10 focus:border-accent text-sm">
+        <p class="text-sm text-slate-400 mb-4">Sign in with your email and password.</p>
+        <input id="authEmail" type="email" placeholder="you@company.com" class="${inputCls}">
+        <input id="authPassword" type="password" placeholder="Password" class="${inputCls}">
         <button onclick="loginPassword()" id="authBtn" class="w-full py-2.5 rounded-lg text-white font-medium" style="background:linear-gradient(135deg,#7c5cff,#6d4bff)">Sign in</button>
-        <button onclick="requestOtp()" class="w-full mt-3 text-xs text-slate-400 hover:text-white">Email me a one-time code instead →</button>
         <div id="authMsg" class="text-xs text-center mt-3 min-h-[16px]"></div>`;
       const em = document.getElementById('authEmail'); em.value = authState.email;
       const pw = document.getElementById('authPassword'); (em.value ? pw : em).focus();
       pw.addEventListener('keydown', e => { if (e.key==='Enter') loginPassword(); });
     } else {
       b.innerHTML = `
-        <p class="text-sm text-slate-400 mb-4">Create your account with an email verification code.</p>
-        <input id="authName" placeholder="Name" class="w-full mb-3 px-3 py-2.5 rounded-lg bg-white/5 outline-none border border-white/10 focus:border-accent text-sm">
-        <input id="authEmail" type="email" placeholder="you@company.com" class="w-full mb-3 px-3 py-2.5 rounded-lg bg-white/5 outline-none border border-white/10 focus:border-accent text-sm">
-        <button onclick="requestOtp()" id="authBtn" class="w-full py-2.5 rounded-lg text-white font-medium" style="background:linear-gradient(135deg,#7c5cff,#6d4bff)">Send code →</button>
+        <p class="text-sm text-slate-400 mb-4">Create your account. We'll email a 6-digit code to verify it's really you.</p>
+        <input id="authName" placeholder="Name" class="${inputCls}">
+        <input id="authEmail" type="email" placeholder="you@company.com" class="${inputCls}">
+        <input id="authPassword" type="password" placeholder="Password (min 8 characters)" class="${inputCls}">
+        <button onclick="requestOtp()" id="authBtn" class="w-full py-2.5 rounded-lg text-white font-medium" style="background:linear-gradient(135deg,#7c5cff,#6d4bff)">Create account & send code →</button>
         <div id="authMsg" class="text-xs text-center mt-3 min-h-[16px]"></div>`;
       const em = document.getElementById('authEmail'); em.value = authState.email; em.focus();
-      em.addEventListener('keydown', e => { if (e.key==='Enter') requestOtp(); });
+      document.getElementById('authPassword').addEventListener('keydown', e => { if (e.key==='Enter') requestOtp(); });
     }
   } else {
     b.innerHTML = `
@@ -570,20 +571,25 @@ async function loginPassword() {
 async function requestOtp() {
   const email = (document.getElementById('authEmail')?.value || authState.email).trim();
   const name = document.getElementById('authName')?.value || '';
+  const password = document.getElementById('authPassword')?.value || authState.password || '';
   const msg = document.getElementById('authMsg');
-  if (!email) { msg.className='text-xs text-center mt-3 text-red-400'; msg.textContent='Enter an email'; return; }
-  authState.email = email;
+  const fail = (t) => { msg.className='text-xs text-center mt-3 text-red-400'; msg.textContent = t; };
+  if (!email) return fail('Enter an email');
+  if (authState.mode === 'register' && password.length < 8) return fail('Password must be at least 8 characters');
+  authState.email = email; authState.password = password;
   const btn = document.getElementById('authBtn'); btn.disabled = true; btn.style.opacity = .6;
+  msg.className='text-xs text-center mt-3 text-slate-400'; msg.textContent = 'Checking email & sending code…';
   try {
     const r = await fetch('/api/auth/request-otp', {method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({email, name, purpose: authState.mode})});
+      body: JSON.stringify({email, name, password, purpose: authState.mode})});
     const data = await r.json();
     if (!r.ok) throw new Error(data.detail || 'Failed');
     authState.devOtp = data.dev_otp || null;
+    authState.sent = data.sent;
     authState.step = 'code';
     renderAuthBody();
   } catch (e) {
-    msg.className='text-xs text-center mt-3 text-red-400'; msg.textContent = e.message;
+    fail(e.message);
     btn.disabled = false; btn.style.opacity = 1;
   }
 }

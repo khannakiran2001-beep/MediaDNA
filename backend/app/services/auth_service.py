@@ -5,6 +5,12 @@ import hashlib
 import secrets
 from datetime import datetime, timedelta, timezone
 
+from email_validator import (
+    EmailNotValidError,
+    EmailSyntaxError,
+    EmailUndeliverableError,
+    validate_email,
+)
 from sqlalchemy import select
 from sqlalchemy.orm import Session as DbSession
 
@@ -52,6 +58,24 @@ class AuthService:
         self.db = db
         self.settings = get_settings()
 
+    # -- validation ---------------------------------------------------------
+    def _validate_email(self, email: str) -> str:
+        """Validate syntax and (best-effort) deliverability. Returns normalized email."""
+        email = (email or "").strip()
+        try:
+            return validate_email(email, check_deliverability=True).normalized.lower()
+        except EmailSyntaxError as exc:
+            raise AuthError(f"Invalid email address: {exc}")
+        except EmailUndeliverableError as exc:
+            msg = str(exc).lower()
+            if "does not exist" in msg or "does not accept email" in msg or "no mx" in msg:
+                raise AuthError("That email domain can't receive mail — please check the address")
+            # DNS/infra hiccup (not a bad domain) — accept if syntax is valid.
+            try:
+                return validate_email(email, check_deliverability=False).normalized.lower()
+            except EmailNotValidError as exc2:
+                raise AuthError(f"Invalid email address: {exc2}")
+
     # -- users --------------------------------------------------------------
     def get_by_email(self, email: str) -> User | None:
         return self.db.scalar(select(User).where(User.email == email.lower()))
@@ -66,14 +90,15 @@ class AuthService:
         return "user"
 
     # -- OTP request --------------------------------------------------------
-    def request_otp(self, email: str, name: str = "", purpose: str = "login") -> dict:
-        email = email.strip().lower()
-        if "@" not in email or "." not in email.split("@")[-1]:
-            raise AuthError("Enter a valid email address")
+    def request_otp(self, email: str, name: str = "", purpose: str = "login", password: str = "") -> dict:
+        email = self._validate_email(email)
 
         user = self.get_by_email(email)
-        if purpose == "register" and user and user.verified:
-            raise AuthError("An account with this email already exists — sign in instead")
+        if purpose == "register":
+            if user and user.verified:
+                raise AuthError("An account with this email already exists — sign in instead")
+            if len(password) < 8:
+                raise AuthError("Password must be at least 8 characters")
         if purpose == "login" and user is None:
             raise AuthError("No account found for this email — register first")
 
@@ -84,7 +109,11 @@ class AuthService:
             self.db.refresh(user)
         elif name and not user.name:
             user.name = name.strip()
-            self.db.commit()
+        # Set/refresh the password during registration (account stays unverified
+        # until the emailed code is confirmed).
+        if purpose == "register" and password:
+            user.password_hash = hash_password(password)
+        self.db.commit()
 
         code = f"{secrets.randbelow(1_000_000):06d}"
         otp = OtpCode(
@@ -139,7 +168,8 @@ class AuthService:
             raise AuthError("Invalid email or password")
         if not user.is_active:
             raise AuthError("Account is deactivated")
-        user.verified = True
+        if not user.verified:
+            raise AuthError("Please verify your email first — enter the code we sent you")
         user.last_login = _now()
         self.db.commit()
         return user, self._issue_token(user)

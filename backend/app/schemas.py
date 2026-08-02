@@ -137,7 +137,8 @@ class CollectionOut(BaseModel):
 class OtpRequest(BaseModel):
     email: str
     name: str = ""
-    purpose: str = "login"  # login | register
+    password: str = ""       # required when purpose == "register"
+    purpose: str = "login"   # login | register
 
 
 class OtpVerify(BaseModel):
