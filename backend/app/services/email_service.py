@@ -53,10 +53,14 @@ def send_email(to: str, subject: str, body: str) -> tuple[bool, str | None]:
 
 
 def send_otp(to: str, code: str, purpose: str) -> tuple[bool, str | None]:
-    action = "Complete your registration" if purpose == "register" else "Sign in"
+    action = {
+        "register": "Complete your registration",
+        "reset": "Reset your password",
+    }.get(purpose, "Sign in")
+    subject = "Your MediaDNA password reset code" if purpose == "reset" else "Your MediaDNA verification code"
     body = (
-        f"Your MediaDNA verification code is: {code}\n\n"
+        f"Your MediaDNA {'password reset' if purpose == 'reset' else 'verification'} code is: {code}\n\n"
         f"{action} by entering this code. It expires in 10 minutes.\n"
         "If you didn't request this, you can ignore this email."
     )
-    return send_email(to, "Your MediaDNA verification code", body)
+    return send_email(to, subject, body)

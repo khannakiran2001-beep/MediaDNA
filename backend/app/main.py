@@ -35,12 +35,14 @@ from .schemas import (
     CommentIn,
     CommentOut,
     EditRegionRequest,
+    ForgotPasswordRequest,
     ForkRequest,
     GenerateRequest,
     GraphResponse,
     OtpRequest,
     OtpVerify,
     PasswordLogin,
+    ResetPasswordRequest,
     RoleUpdate,
     SearchRequest,
     SearchHit,
@@ -130,6 +132,23 @@ def auth_verify(body: OtpVerify, db: Session = Depends(get_db)):
 def auth_login_password(body: PasswordLogin, db: Session = Depends(get_db)):
     try:
         user, token = AuthService(db).login_password(body.email, body.password)
+    except AuthError as exc:
+        raise HTTPException(400, str(exc))
+    return {"token": token, "user": user}
+
+
+@app.post("/api/auth/forgot-password")
+def auth_forgot_password(body: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    try:
+        return AuthService(db).request_password_reset(body.email)
+    except AuthError as exc:
+        raise HTTPException(400, str(exc))
+
+
+@app.post("/api/auth/reset-password", response_model=AuthResult)
+def auth_reset_password(body: ResetPasswordRequest, db: Session = Depends(get_db)):
+    try:
+        user, token = AuthService(db).reset_password(body.email, body.code, body.new_password)
     except AuthError as exc:
         raise HTTPException(400, str(exc))
     return {"token": token, "user": user}

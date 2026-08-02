@@ -495,8 +495,8 @@ function renderAuth() {
         <div><div class="font-bold text-xl leading-none">MediaDNA</div><div class="text-[11px] text-slate-500 mt-0.5">GitHub for AI Assets</div></div>
       </div>
       <div class="flex gap-1 mb-6 bg-white/5 rounded-lg p-1 text-sm">
-        <button onclick="setAuthMode('login')" class="flex-1 py-2 rounded-md ${isLogin?'bg-white/10 text-white font-medium':'text-slate-400'}">Sign in</button>
-        <button onclick="setAuthMode('register')" class="flex-1 py-2 rounded-md ${!isLogin?'bg-white/10 text-white font-medium':'text-slate-400'}">Register</button>
+        <button onclick="setAuthMode('login')" class="flex-1 py-2 rounded-md ${authState.mode==='login'?'bg-white/10 text-white font-medium':'text-slate-400'}">Sign in</button>
+        <button onclick="setAuthMode('register')" class="flex-1 py-2 rounded-md ${authState.mode==='register'?'bg-white/10 text-white font-medium':'text-slate-400'}">Register</button>
       </div>
       <div id="authBody"></div>
     </div>
@@ -508,44 +508,57 @@ function setAuthMode(mode) { authState.mode = mode; authState.step = 'email'; au
 
 function renderAuthBody() {
   const b = document.getElementById('authBody');
-  const isLogin = authState.mode === 'login';
+  const mode = authState.mode;
+  const inputCls = 'w-full mb-3 px-3 py-2.5 rounded-lg bg-white/5 outline-none border border-white/10 focus:border-accent text-sm';
+  const btnStyle = 'style="background:linear-gradient(135deg,#7c5cff,#6d4bff)"';
   if (authState.step === 'email') {
-    const inputCls = 'w-full mb-3 px-3 py-2.5 rounded-lg bg-white/5 outline-none border border-white/10 focus:border-accent text-sm';
-    if (isLogin) {
+    if (mode === 'login') {
       b.innerHTML = `
         <p class="text-sm text-slate-400 mb-4">Sign in with your email and password.</p>
         <input id="authEmail" type="email" placeholder="you@company.com" class="${inputCls}">
         <input id="authPassword" type="password" placeholder="Password" class="${inputCls}">
-        <button onclick="loginPassword()" id="authBtn" class="w-full py-2.5 rounded-lg text-white font-medium" style="background:linear-gradient(135deg,#7c5cff,#6d4bff)">Sign in</button>
-        <div id="authMsg" class="text-xs text-center mt-3 min-h-[16px]"></div>`;
+        <button onclick="loginPassword()" id="authBtn" class="w-full py-2.5 rounded-lg text-white font-medium" ${btnStyle}>Sign in</button>
+        <button onclick="setAuthMode('reset')" class="w-full mt-3 text-xs text-slate-400 hover:text-white">Forgot password?</button>
+        <div id="authMsg" class="text-xs text-center mt-2 min-h-[16px]"></div>`;
       const em = document.getElementById('authEmail'); em.value = authState.email;
       const pw = document.getElementById('authPassword'); (em.value ? pw : em).focus();
       pw.addEventListener('keydown', e => { if (e.key==='Enter') loginPassword(); });
-    } else {
+    } else if (mode === 'register') {
       b.innerHTML = `
         <p class="text-sm text-slate-400 mb-4">Create your account. We'll email a 6-digit code to verify it's really you.</p>
         <input id="authName" placeholder="Name" class="${inputCls}">
         <input id="authEmail" type="email" placeholder="you@company.com" class="${inputCls}">
         <input id="authPassword" type="password" placeholder="Password (min 8 characters)" class="${inputCls}">
-        <button onclick="requestOtp()" id="authBtn" class="w-full py-2.5 rounded-lg text-white font-medium" style="background:linear-gradient(135deg,#7c5cff,#6d4bff)">Create account & send code →</button>
+        <button onclick="requestOtp()" id="authBtn" class="w-full py-2.5 rounded-lg text-white font-medium" ${btnStyle}>Create account & send code →</button>
         <div id="authMsg" class="text-xs text-center mt-3 min-h-[16px]"></div>`;
       const em = document.getElementById('authEmail'); em.value = authState.email; em.focus();
       document.getElementById('authPassword').addEventListener('keydown', e => { if (e.key==='Enter') requestOtp(); });
+    } else { // reset
+      b.innerHTML = `
+        <p class="text-sm text-slate-400 mb-4">Enter your email and we'll send a code to reset your password.</p>
+        <input id="authEmail" type="email" placeholder="you@company.com" class="${inputCls}">
+        <button onclick="forgotPassword()" id="authBtn" class="w-full py-2.5 rounded-lg text-white font-medium" ${btnStyle}>Send reset code →</button>
+        <button onclick="setAuthMode('login')" class="w-full mt-3 text-xs text-slate-400 hover:text-white">← back to sign in</button>
+        <div id="authMsg" class="text-xs text-center mt-2 min-h-[16px]"></div>`;
+      const em = document.getElementById('authEmail'); em.value = authState.email; em.focus();
+      em.addEventListener('keydown', e => { if (e.key==='Enter') forgotPassword(); });
     }
-  } else {
+  } else { // code step
+    const isReset = mode === 'reset';
     b.innerHTML = `
       <p class="text-sm text-slate-400 mb-1">Enter the 6-digit code sent to</p>
       <p class="text-sm text-accent2 mb-4">${authState.email}</p>
       ${authState.devOtp ? `<div class="mb-3 text-xs rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-300 p-2">Dev mode (no mailer configured): your code is <span class="font-mono font-bold">${authState.devOtp}</span></div>` : ''}
       <input id="authCode" inputmode="numeric" maxlength="6" placeholder="000000" class="w-full mb-3 px-3 py-2.5 rounded-lg bg-white/5 outline-none border border-white/10 focus:border-accent text-center text-2xl font-mono tracking-[0.4em]">
-      <button onclick="verifyOtp()" id="authBtn" class="w-full py-2.5 rounded-lg text-white font-medium" style="background:linear-gradient(135deg,#7c5cff,#6d4bff)">Verify & continue →</button>
+      ${isReset ? `<input id="authNewPassword" type="password" placeholder="New password (min 8 characters)" class="${inputCls}">` : ''}
+      <button onclick="${isReset ? 'resetPassword()' : 'verifyOtp()'}" id="authBtn" class="w-full py-2.5 rounded-lg text-white font-medium" ${btnStyle}>${isReset ? 'Reset password' : 'Verify & continue →'}</button>
       <div class="flex justify-between mt-3 text-xs">
         <button onclick="authState.step='email';renderAuthBody()" class="text-slate-500 hover:text-white">← change email</button>
-        <button onclick="requestOtp()" class="text-slate-500 hover:text-white">resend code</button>
+        <button onclick="${isReset ? 'forgotPassword()' : 'requestOtp()'}" class="text-slate-500 hover:text-white">resend code</button>
       </div>
       <div id="authMsg" class="text-xs text-center mt-2 min-h-[16px]"></div>`;
     const cd = document.getElementById('authCode'); cd.focus();
-    cd.addEventListener('keydown', e => { if (e.key==='Enter') verifyOtp(); });
+    cd.addEventListener('keydown', e => { if (e.key==='Enter') { isReset ? resetPassword() : verifyOtp(); } });
   }
 }
 
@@ -566,6 +579,42 @@ async function loginPassword() {
     msg.className='text-xs text-center mt-3 text-red-400'; msg.textContent = e.message;
     btn.disabled = false; btn.style.opacity = 1;
   }
+}
+
+async function forgotPassword() {
+  const email = (document.getElementById('authEmail')?.value || authState.email).trim();
+  const msg = document.getElementById('authMsg');
+  const fail = (t) => { msg.className='text-xs text-center mt-2 text-red-400'; msg.textContent = t; };
+  if (!email) return fail('Enter your email');
+  authState.email = email;
+  const btn = document.getElementById('authBtn'); btn.disabled = true; btn.style.opacity = .6;
+  msg.className='text-xs text-center mt-2 text-slate-400'; msg.textContent = 'Sending reset code…';
+  try {
+    const r = await fetch('/api/auth/forgot-password', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({email})});
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.detail || 'Failed');
+    authState.devOtp = data.dev_otp || null;
+    authState.step = 'code';
+    renderAuthBody();
+  } catch (e) { fail(e.message); btn.disabled = false; btn.style.opacity = 1; }
+}
+
+async function resetPassword() {
+  const code = document.getElementById('authCode').value.trim();
+  const np = document.getElementById('authNewPassword').value || '';
+  const msg = document.getElementById('authMsg');
+  const fail = (t) => { msg.className='text-xs text-center mt-2 text-red-400'; msg.textContent = t; };
+  if (np.length < 8) return fail('New password must be at least 8 characters');
+  const btn = document.getElementById('authBtn'); btn.disabled = true; btn.style.opacity = .6;
+  try {
+    const r = await fetch('/api/auth/reset-password', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({email: authState.email, code, new_password: np})});
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.detail || 'Reset failed');
+    setToken(data.token); currentUser = data.user; state.view = 'dashboard';
+    render();
+  } catch (e) { fail(e.message); btn.disabled = false; btn.style.opacity = 1; }
 }
 
 async function requestOtp() {

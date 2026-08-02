@@ -135,11 +135,16 @@ class AuthService:
         return result
 
     # -- OTP verify ---------------------------------------------------------
-    def verify_otp(self, email: str, code: str) -> tuple[User, str]:
+    def _consume_otp(self, email: str, code: str, purposes: set[str]) -> User:
+        """Validate + consume the latest matching OTP; return the user."""
         email = email.strip().lower()
         otp = self.db.scalar(
             select(OtpCode)
-            .where(OtpCode.email == email, OtpCode.consumed == False)  # noqa: E712
+            .where(
+                OtpCode.email == email,
+                OtpCode.consumed == False,  # noqa: E712
+                OtpCode.purpose.in_(purposes),
+            )
             .order_by(OtpCode.created_at.desc())
         )
         if otp is None:
@@ -158,6 +163,41 @@ class AuthService:
         user = self.get_by_email(email)
         if user is None:
             raise AuthError("Account not found")
+        self.db.commit()
+        return user
+
+    def verify_otp(self, email: str, code: str) -> tuple[User, str]:
+        user = self._consume_otp(email, code, {"login", "register"})
+        user.verified = True
+        user.last_login = _now()
+        self.db.commit()
+        return user, self._issue_token(user)
+
+    # -- password reset -----------------------------------------------------
+    def request_password_reset(self, email: str) -> dict:
+        email = self._validate_email(email)
+        user = self.get_by_email(email)
+        if user is None:
+            raise AuthError("No account found for this email")
+        code = f"{secrets.randbelow(1_000_000):06d}"
+        self.db.add(OtpCode(
+            email=email, code_hash=_hash(code), purpose="reset",
+            expires_at=_now() + timedelta(seconds=self.settings.otp_ttl_seconds),
+        ))
+        self.db.commit()
+        sent, error = email_service.send_otp(email, code, "reset")
+        if self.settings.smtp_configured and not sent:
+            raise AuthError(error or "Could not send the reset email. Please try again.")
+        result = {"email": email, "sent": sent, "dev_mode": not self.settings.smtp_configured}
+        if not self.settings.smtp_configured:
+            result["dev_otp"] = code
+        return result
+
+    def reset_password(self, email: str, code: str, new_password: str) -> tuple[User, str]:
+        if len(new_password) < 8:
+            raise AuthError("Password must be at least 8 characters")
+        user = self._consume_otp(email, code, {"reset"})
+        user.password_hash = hash_password(new_password)
         user.verified = True
         user.last_login = _now()
         self.db.commit()
