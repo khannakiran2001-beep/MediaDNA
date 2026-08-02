@@ -465,7 +465,29 @@ def activity(db: Session = Depends(get_db)):
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "huggingface": settings.huggingface_enabled, "b2": settings.b2_enabled}
+    return {
+        "status": "ok",
+        "huggingface": settings.huggingface_enabled,
+        "b2": settings.b2_enabled,
+        "smtp": settings.smtp_configured,
+        "email_mode": "smtp" if settings.smtp_configured else "dev (code shown in-app)",
+    }
+
+
+@app.post("/api/admin/test-email")
+def admin_test_email(admin: User = Depends(require_admin)):
+    """Send a test email to the admin to verify SMTP delivery."""
+    if not settings.smtp_configured:
+        raise HTTPException(400, "SMTP is not configured — set SMTP_HOST/USER/PASSWORD env vars")
+    from .services import email_service
+
+    sent, error = email_service.send_email(
+        admin.email, "MediaDNA SMTP test",
+        "This is a test email from MediaDNA. If you received it, OTP delivery works.",
+    )
+    if not sent:
+        raise HTTPException(400, error or "Send failed")
+    return {"sent": True, "to": admin.email}
 
 
 # --- Frontend (served last so /api takes precedence) ------------------------

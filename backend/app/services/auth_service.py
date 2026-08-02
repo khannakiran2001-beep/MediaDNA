@@ -125,7 +125,10 @@ class AuthService:
         self.db.add(otp)
         self.db.commit()
 
-        sent = email_service.send_otp(email, code, purpose)
+        sent, error = email_service.send_otp(email, code, purpose)
+        if self.settings.smtp_configured and not sent:
+            # Configured but delivery failed — tell the user instead of failing silently.
+            raise AuthError(error or "Could not send the verification email. Please try again.")
         result = {"email": email, "sent": sent, "dev_mode": not self.settings.smtp_configured}
         if not self.settings.smtp_configured:
             result["dev_otp"] = code  # surfaced in-app when no mailer is set up
