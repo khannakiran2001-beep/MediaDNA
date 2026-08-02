@@ -144,7 +144,8 @@ class AssetService:
             owner_email=owner_email,
             parent_id=parent_id,
         )
-        # The Genblaze manifest is the authoritative provenance record.
+        # The Genblaze manifest is the authoritative provenance record; also
+        # persist it as a durable artifact in B2 (data orchestration).
         if gen.manifest:
             asset.provenance = {
                 "source": "genblaze",
@@ -154,6 +155,16 @@ class AssetService:
                 "manifest": gen.manifest,
             }
             self.assets.save(asset)
+            try:
+                import json as _json
+
+                self.storage.put(
+                    f"manifests/{asset.id}.json",
+                    _json.dumps(gen.manifest, default=str).encode(),
+                    "application/json",
+                )
+            except Exception:
+                pass
         self.audit.log("generate", asset.id, {
             "prompt": prompt,
             "genblaze_run_id": gen.run_id,

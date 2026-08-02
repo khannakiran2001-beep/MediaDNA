@@ -8,6 +8,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
@@ -15,6 +16,37 @@ from PIL import Image
 
 from . import providers
 from .providers import AIProvider
+
+_STOPWORDS = set(
+    "a an the of in on at to for with and or from into over under this that these those is are "
+    "was were be been being your you our their his her its it as by very more most detailed high "
+    "quality photo image picture rendering render style shot".split()
+)
+_PEOPLE_WORDS = {"person", "people", "man", "woman", "boy", "girl", "child", "portrait", "face", "human"}
+
+
+def _keywords(text: str, limit: int = 12) -> list[str]:
+    """Extract meaningful label words from a prompt/caption (free, no model)."""
+    out: list[str] = []
+    for w in re.findall(r"[a-zA-Z][a-zA-Z\-]{2,}", (text or "").lower()):
+        if w in _STOPWORDS or w in out:
+            continue
+        out.append(w)
+        if len(out) >= limit:
+            break
+    return out
+
+
+def _ocr(image: Image.Image | None) -> str:
+    """Real OCR via Tesseract when available (installed in the Docker image)."""
+    if image is None:
+        return ""
+    try:
+        import pytesseract  # optional; present in the container
+
+        return pytesseract.image_to_string(image).strip()[:2000]
+    except Exception:
+        return ""
 
 
 @dataclass
@@ -57,15 +89,23 @@ def run(
             image = None
 
     # 2. captioning ----------------------------------------------------------
-    caption = provider.caption(image, raw)
+    # For generated assets the prompt is the ground-truth description (free &
+    # accurate); for uploads with no prompt, fall back to the provider.
+    if prompt.strip():
+        caption = prompt.strip()
+        keywords = _keywords(prompt)
+        objects = [{"label": k, "score": 1.0, "source": "prompt"} for k in keywords]
+    else:
+        caption = provider.caption(image, raw)
+        objects = provider.detect_objects(image, raw)
+        keywords = [o["label"] for o in objects]
     result.fields["caption"] = caption
     _log(result, "caption", caption)
 
-    # 3. object detection ----------------------------------------------------
-    objects = provider.detect_objects(image, raw)
+    # 3. object / people / logo labels --------------------------------------
     result.fields["objects_detected"] = objects
-    result.fields["people_detected"] = sum(1 for o in objects if o["label"] == "person")
-    result.fields["brand_logos"] = [o["label"] for o in objects if "logo" in o["label"]]
+    result.fields["people_detected"] = sum(1 for k in keywords if k in _PEOPLE_WORDS)
+    result.fields["brand_logos"] = [k for k in keywords if "logo" in k or "brand" in k]
     _log(result, "detection", ", ".join(o["label"] for o in objects) or "none")
 
     # 4. colour / style / quality -------------------------------------------
@@ -88,17 +128,23 @@ def run(
         result.fields["visual_style"] = media_type
         result.fields["quality_score"] = 0.0
 
-    # 5. OCR (heuristic placeholder unless HF handles it upstream) -----------
-    result.fields["ocr_text"] = ""
+    # 5. OCR (real, via Tesseract when available) ---------------------------
+    ocr_text = _ocr(image)
+    result.fields["ocr_text"] = ocr_text
+    if ocr_text:
+        _log(result, "ocr", f"{len(ocr_text)} chars extracted")
 
     # 6. safety --------------------------------------------------------------
     result.fields["safety"] = {"nsfw": False, "violence": False, "reviewed": True}
 
-    # 7. embedding (prompt + caption + tags/objects) ------------------------
+    # 7. embedding (prompt + caption + labels + ocr) ------------------------
     embed_text = " ".join(
-        [prompt, caption] + [o["label"] for o in objects]
+        [prompt, caption, ocr_text] + [o["label"] for o in objects]
     ).strip()
     result.fields["embedding"] = provider.embed(embed_text)
+    result.artifacts[f"embeddings/{asset_id}.json"] = (
+        json.dumps(result.fields["embedding"]).encode(), "application/json",
+    )
     _log(result, "embedding", f"{len(result.fields['embedding'])}-dim vector")
 
     # 8. provenance record (also stored as JSON artifact) -------------------
