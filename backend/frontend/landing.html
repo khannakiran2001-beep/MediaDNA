@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MediaDNA — GitHub for AI Assets</title>
+  <meta name="description" content="Every AI-generated asset gets a permanent identity, complete lineage, and searchable history. Built on Genblaze + Backblaze B2." />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { theme: { extend: { colors: {
+      accent: '#7c5cff', accent2: '#22d3ee', ink: '#0a0a0f'
+    }, fontFamily: { sans: ['Inter','system-ui','sans-serif'] } } } };
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    body { background:
+      radial-gradient(900px 500px at 85% -10%, #241a5e 0%, transparent 55%),
+      radial-gradient(700px 400px at 0% 10%, #0d2b3a 0%, transparent 50%), #0a0a0f;
+      color:#e5e7eb; font-family:Inter,system-ui,sans-serif; }
+    .grad { background:linear-gradient(90deg,#a78bfa,#22d3ee); -webkit-background-clip:text; background-clip:text; color:transparent; }
+    .card { background:rgba(18,18,26,.65); border:1px solid #ffffff14; backdrop-filter:blur(10px); }
+    .btn { background:linear-gradient(135deg,#7c5cff,#6d4bff); }
+    .fade { animation:f .7s ease both; } @keyframes f { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:none} }
+    .flow div { border:1px solid #ffffff1a; }
+  </style>
+</head>
+<body class="min-h-screen">
+  <!-- Nav -->
+  <header class="max-w-6xl mx-auto px-6 py-5 flex items-center justify-between">
+    <div class="flex items-center gap-2">
+      <div class="w-8 h-8 rounded-lg" style="background:linear-gradient(135deg,#7c5cff,#22d3ee)"></div>
+      <span class="font-extrabold text-lg">MediaDNA</span>
+    </div>
+    <nav class="hidden md:flex items-center gap-7 text-sm text-slate-300">
+      <a href="#problem" class="hover:text-white">Problem</a>
+      <a href="#how" class="hover:text-white">How it works</a>
+      <a href="#features" class="hover:text-white">Features</a>
+      <a href="#arch" class="hover:text-white">Architecture</a>
+      <a href="#faq" class="hover:text-white">FAQ</a>
+    </nav>
+    <a href="/app" class="btn px-4 py-2 rounded-lg text-white text-sm font-medium">Launch app →</a>
+  </header>
+
+  <!-- Hero -->
+  <section class="max-w-5xl mx-auto px-6 pt-16 pb-20 text-center fade">
+    <div class="inline-flex items-center gap-2 text-xs px-3 py-1 rounded-full card mb-6">
+      🧬 Built on <span class="text-accent2">Genblaze</span> + <span class="text-accent2">Backblaze B2</span>
+    </div>
+    <h1 class="text-5xl md:text-6xl font-black leading-tight">
+      <span class="grad">GitHub</span> for AI-generated assets
+    </h1>
+    <p class="mt-6 text-lg text-slate-400 max-w-2xl mx-auto">
+      Software has Git. Design has Figma. AI media has nothing. MediaDNA gives every generated
+      image, video, and audio a <b class="text-slate-200">permanent identity, complete lineage,
+      and searchable history</b> — with cryptographically verified provenance.
+    </p>
+    <div class="mt-9 flex items-center justify-center gap-3">
+      <a href="/app" class="btn px-6 py-3 rounded-xl text-white font-semibold">Try the live demo</a>
+      <a href="https://github.com/khannakiran2001-beep/MediaDNA" class="px-6 py-3 rounded-xl card font-medium hover:border-white/30">View source</a>
+    </div>
+    <p class="mt-4 text-xs text-slate-600">No install — sign in with a one-time email code.</p>
+  </section>
+
+  <!-- Problem -->
+  <section id="problem" class="max-w-6xl mx-auto px-6 py-16">
+    <div class="grid md:grid-cols-2 gap-10 items-center">
+      <div>
+        <h2 class="text-3xl font-bold mb-4">Teams generate thousands of assets, then <span class="grad">lose all context</span></h2>
+        <p class="text-slate-400 mb-6">Weeks later nobody knows which prompt made it, which model, which version is newest, which campaign used it, or what it evolved from.</p>
+        <div class="card rounded-xl p-5 font-mono text-sm text-slate-400 leading-7">
+          Generate image<br>↓<br>Download<br>↓<br>
+          <span class="text-red-300">rename file_final_v3_real_final.png</span><br>↓<br>
+          Upload to Drive<br>↓<br><span class="text-red-400">forget everything</span>
+        </div>
+      </div>
+      <div class="card rounded-2xl p-6">
+        <div class="text-sm text-slate-400 mb-3">With MediaDNA, every asset carries its DNA:</div>
+        <div class="grid grid-cols-2 gap-2 text-xs">
+          <span class="card rounded px-3 py-2">Original prompt</span>
+          <span class="card rounded px-3 py-2">Model & provider</span>
+          <span class="card rounded px-3 py-2">Parent → children lineage</span>
+          <span class="card rounded px-3 py-2">Version history</span>
+          <span class="card rounded px-3 py-2">Objects, colours, OCR</span>
+          <span class="card rounded px-3 py-2">Embedding for search</span>
+          <span class="card rounded px-3 py-2">Checksum + provenance</span>
+          <span class="card rounded px-3 py-2">Approvals & comments</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- How it works -->
+  <section id="how" class="max-w-6xl mx-auto px-6 py-16">
+    <h2 class="text-3xl font-bold text-center mb-3">The <span class="grad">Genblaze</span> pipeline</h2>
+    <p class="text-slate-400 text-center mb-10 max-w-2xl mx-auto">Upload or generate → a real <code class="text-accent2">genblaze.Pipeline</code> orchestrates every stage and emits a verified provenance manifest → everything lands in Backblaze B2.</p>
+    <div class="flow flex flex-wrap justify-center gap-2 text-sm">
+      <div class="rounded-lg px-4 py-3 card">Upload / Generate</div>
+      <div class="rounded-lg px-4 py-3 card">Metadata + checksum</div>
+      <div class="rounded-lg px-4 py-3 card">Caption + OCR</div>
+      <div class="rounded-lg px-4 py-3 card">Colour / style / quality</div>
+      <div class="rounded-lg px-4 py-3 card">Embedding</div>
+      <div class="rounded-lg px-4 py-3 card">Relationship + dedup</div>
+      <div class="rounded-lg px-4 py-3 card">Verified manifest</div>
+      <div class="rounded-lg px-4 py-3 card">Store in B2 (signed URLs)</div>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section id="features" class="max-w-6xl mx-auto px-6 py-16">
+    <h2 class="text-3xl font-bold text-center mb-10">Everything an AI asset needs</h2>
+    <div id="featureGrid" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+  </section>
+
+  <!-- Architecture -->
+  <section id="arch" class="max-w-6xl mx-auto px-6 py-16">
+    <h2 class="text-3xl font-bold text-center mb-10">Architecture</h2>
+    <div class="grid md:grid-cols-3 gap-4">
+      <div class="card rounded-xl p-6">
+        <div class="text-accent2 text-sm mb-2">Generation & orchestration</div>
+        <div class="font-semibold mb-1">Genblaze SDK</div>
+        <p class="text-sm text-slate-400">Real <code>Pipeline</code>, <code>Step</code>, <code>Run</code>, and a hash-verified <code>Manifest</code> for every asset. Provider-agnostic.</p>
+      </div>
+      <div class="card rounded-xl p-6">
+        <div class="text-accent2 text-sm mb-2">Durable storage</div>
+        <div class="font-semibold mb-1">Backblaze B2</div>
+        <p class="text-sm text-slate-400">Originals, thumbnails, embeddings & manifests via <code>genblaze_s3</code>. Delivered with short-lived signed URLs — credentials never touch the client.</p>
+      </div>
+      <div class="card rounded-xl p-6">
+        <div class="text-accent2 text-sm mb-2">App</div>
+        <div class="font-semibold mb-1">FastAPI · Postgres · SPA</div>
+        <p class="text-sm text-slate-400">Clean architecture (repository + service layers), email-OTP + admin auth, semantic search, and an interactive lineage graph.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section id="faq" class="max-w-3xl mx-auto px-6 py-16">
+    <h2 class="text-3xl font-bold text-center mb-8">FAQ</h2>
+    <div id="faqList" class="space-y-3"></div>
+  </section>
+
+  <!-- CTA -->
+  <section class="max-w-4xl mx-auto px-6 py-20 text-center">
+    <h2 class="text-4xl font-black mb-4">Give your AI assets a <span class="grad">memory</span>.</h2>
+    <a href="/app" class="btn inline-block px-8 py-4 rounded-xl text-white font-semibold text-lg">Launch MediaDNA →</a>
+  </section>
+
+  <footer class="border-t border-white/5 py-8 text-center text-xs text-slate-600">
+    MediaDNA · Built on Genblaze + Backblaze B2 · <a href="https://github.com/khannakiran2001-beep/MediaDNA" class="hover:text-slate-400">GitHub</a>
+  </footer>
+
+  <script>
+    const features = [
+      ['🧬','Full DNA record','Prompt, model, provider, params, checksum, provenance JSON — permanently.'],
+      ['⋔','Lineage graph','Auto-detected relationships: forked, edited, upscaled, duplicate. Click any node.'],
+      ['⌕','Semantic search','Natural language + embeddings + metadata: "cyberpunk images from the summer campaign".'],
+      ['⑂','Fork & regenerate','Branch any asset into a new variation, or select a region to regenerate.'],
+      ['⛓️','Verified provenance','Every generation carries a cryptographically verified Genblaze manifest.'],
+      ['✔','Approvals & admin','Review workflow, roles, audit logs, comments, and version history.'],
+    ];
+    document.getElementById('featureGrid').innerHTML = features.map(f =>
+      `<div class="card rounded-xl p-5"><div class="text-2xl mb-2">${f[0]}</div>
+       <div class="font-semibold mb-1">${f[1]}</div><div class="text-sm text-slate-400">${f[2]}</div></div>`).join('');
+
+    const faqs = [
+      ['Is it really using Backblaze B2 and Genblaze?','Yes — generation runs through a real genblaze.Pipeline that emits a verified manifest, and all artifacts are stored in Backblaze B2 through the official genblaze_s3 backend with signed-URL delivery.'],
+      ['What can I store?','AI-generated or uploaded images, video, audio, and documents. Each gets a DNA profile and a place in the lineage graph.'],
+      ['How does search work?','It combines embedding similarity with metadata and keyword filters (provider, model, project, tags) so you can ask in plain language.'],
+      ['How do I sign in?','Email one-time code, or password for the admin account. No third-party auth required.'],
+    ];
+    document.getElementById('faqList').innerHTML = faqs.map(q =>
+      `<details class="card rounded-xl p-4"><summary class="cursor-pointer font-medium">${q[0]}</summary>
+       <p class="text-sm text-slate-400 mt-2">${q[1]}</p></details>`).join('');
+  </script>
+</body>
+</html>

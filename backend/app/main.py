@@ -471,7 +471,12 @@ def health():
 # --- Frontend (served last so /api takes precedence) ------------------------
 
 @app.get("/")
-def index():
+def landing():
+    return FileResponse(FRONTEND_DIR / "landing.html")
+
+
+@app.get("/app")
+def app_spa():
     return FileResponse(FRONTEND_DIR / "index.html")
 
 
