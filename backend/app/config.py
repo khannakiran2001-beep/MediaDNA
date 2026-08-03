@@ -57,6 +57,8 @@ class Settings(BaseSettings):
     # Auth ------------------------------------------------------------------
     secret_key: str = "change-me-in-production-please"
     otp_ttl_seconds: int = 600          # 10 minutes
+    otp_cooldown_seconds: int = 30      # min gap between code requests per email
+    otp_max_per_hour: int = 8           # max code requests per email per hour
     session_ttl_seconds: int = 60 * 60 * 24 * 7  # 7 days
     admin_emails: str = ""              # comma-separated; else first user is admin
 

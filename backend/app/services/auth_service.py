@@ -76,6 +76,21 @@ class AuthService:
             except EmailNotValidError as exc2:
                 raise AuthError(f"Invalid email address: {exc2}")
 
+    def _enforce_otp_rate(self, email: str) -> None:
+        """Cooldown between code requests + hourly cap, per email (anti-abuse)."""
+        now = _now()
+        recents = list(self.db.scalars(
+            select(OtpCode).where(OtpCode.email == email).order_by(OtpCode.created_at.desc())
+        ))
+        if recents:
+            age = (now - _aware(recents[0].created_at)).total_seconds()
+            if age < self.settings.otp_cooldown_seconds:
+                wait = int(self.settings.otp_cooldown_seconds - age) or 1
+                raise AuthError(f"Please wait {wait}s before requesting another code")
+            in_last_hour = sum(1 for o in recents if (now - _aware(o.created_at)).total_seconds() < 3600)
+            if in_last_hour >= self.settings.otp_max_per_hour:
+                raise AuthError("Too many code requests — please try again later")
+
     # -- users --------------------------------------------------------------
     def get_by_email(self, email: str) -> User | None:
         return self.db.scalar(select(User).where(User.email == email.lower()))
@@ -101,6 +116,8 @@ class AuthService:
                 raise AuthError("Password must be at least 8 characters")
         if purpose == "login" and user is None:
             raise AuthError("No account found for this email — register first")
+
+        self._enforce_otp_rate(email)
 
         if user is None:
             user = User(email=email, name=name.strip(), role=self._role_for(email))
@@ -179,6 +196,7 @@ class AuthService:
         user = self.get_by_email(email)
         if user is None:
             raise AuthError("No account found for this email")
+        self._enforce_otp_rate(email)
         code = f"{secrets.randbelow(1_000_000):06d}"
         self.db.add(OtpCode(
             email=email, code_hash=_hash(code), purpose="reset",
